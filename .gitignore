@@ -1,0 +1,11 @@
+*.bak
+*.txt
+*.hs
+*.hi
+*.o
+*.x
+Makefile
+*.y
+*.exe
+*.sh
+*.info
