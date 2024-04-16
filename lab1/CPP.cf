@@ -13,13 +13,13 @@ DStruct.    Def ::= Strct ;
 DKStruct.   Def ::= [KWord] Strct ;
 
 -- Directivas de alto nivel
-DTDir.  TDir  ::= Type [Id] ";" ;
-DTDir1. TDir  ::= Type "&" Id ";" ;
-DTDir2. TDir  ::= Type "[" "]" Id  ";" ;
-DTDir3. TDir  ::= Type Id "[" "]" ";" ;
-DTDir4. TDir  ::= Type ";" ;
-DTDir5. TDir  ::= Type "&" Id "=" Exp ";" ;
-DTDir6. TDir  ::= Type Id "=" Exp ";" ;
+TDDir.  TDir  ::= Type [Id] ";" ;
+TDDir1. TDir  ::= Type "&" Id ";" ;
+TDDir2. TDir  ::= Type "[" "]" Id  ";" ;
+TDDir3. TDir  ::= Type Id "[" "]" ";" ;
+TDDir4. TDir  ::= Type ";" ;
+TDDir5. TDir  ::= Type "&" Id "=" Exp ";" ;
+TDDir6. TDir  ::= Type Id "=" Exp ";" ;
 
 -- Funciones
 FFunc.  Func  ::= Type Id "(" [Arg] ")" ";" ;
@@ -49,13 +49,13 @@ SKInit.      Stm2 ::= [KWord] SIni ;
 SEmpt.       Stm1 ::= ";" ;
 SExp.        Stm1 ::= Exp ";" ;
 SBlock.      Stm1 ::= "{" [Stm] "}" ;
-SIfElse.     Stm1 ::= "if" "(" Exp ")" Stm1 "else" Stm1 ;
-SIf.         Stm ::= "if" "(" Exp ")" Stm1 ;
+SIfElse.     Stm1 ::= "if" "(" Exp ")" Stm "else" Stm ;
+SIf.         Stm ::= "if" "(" Exp ")" Stm ;
 SReturn.     Stm ::= "return" Exp ";" ;
 SReturnVoid. Stm ::= "return" ";" ;
 SWhile.      Stm ::= "while" "(" Exp ")" Stm ;
 SDoWhile.    Stm ::= "do" Stm "while" "(" Exp ")" ";" ;
-SFor.        Stm ::= "for" "(" Stm1 Exp ";" Exp ")" Stm ;
+SFor.        Stm ::= "for" "(" Fini ";" Exp ";" Exp ")" Stm ;
 coercions Stm 2 ;
 
 
@@ -72,6 +72,10 @@ SSIni2.     SIni ::= Type "&" Id "=" Exp ";" ;
 SSIni3.     SIni ::= Type "&" Id ";" ;
 SSIni4.     SIni ::= Type [Id] ";" ;
 
+
+FFini.     Fini ::= Type Id "=" Exp ;
+FFini1.    Fini ::= Id "=" Exp ;
+FFini2.    Fini ::= Type Id ;
 
 
 -- Expresiones
@@ -101,6 +105,7 @@ EPlus.    Exp11  ::= Exp11 "+"  Exp12 ;
 EMinus.   Exp11  ::= Exp11 "-"  Exp12 ;
 ELShif.   Exp10  ::= Exp10 "<<" Exp11 ;
 ERShif.   Exp10  ::= Exp10 ">>" Exp11 ;
+ELt.      Exp9   ::= Exp9  "<"  Exp10 ;
 EGt.      Exp9   ::= Exp9  ">"  Exp10 ;
 ELtEq.    Exp9   ::= Exp9  "<=" Exp10 ;
 EGtEq.    Exp9   ::= Exp9  ">=" Exp10 ;
@@ -109,6 +114,8 @@ ENEq.     Exp8   ::= Exp8  "!=" Exp9 ;
 EAnd.     Exp4   ::= Exp4  "&&" Exp5 ;
 EOr.      Exp3   ::= Exp3  "||" Exp4 ;
 EAss.     Exp2   ::= Exp2 "=" Exp3 ;
+EMAss.    Exp2   ::= Exp2 "-=" Exp3 ;
+EPAss.    Exp2   ::= Exp2 "+=" Exp3 ;
 ECond.    Exp2   ::= Exp2 "?" Exp3 ":" Exp3 ;
 EThrow.   Exp1   ::= "throw" Exp2 ;
 
