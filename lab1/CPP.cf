@@ -2,41 +2,79 @@ comment "#" ;
 comment "//" ;
 comment "/*" "*/" ;
 
-PDefs.   Program ::= [Def] ;
-
-
+PDefs. Program ::= [Def] ;
 
 terminator  Def "" ;
-DUsing.     Def    ::= "using" [Qua] ";" ;
-DFun.       Def    ::= Type Id "(" [Arg] ")" ";" ;
-DBFun.      Def    ::= Type Id "(" [Arg] ")" "{" [Stm] "}" ;
-DTdef.      Def ::= TDef;
+DPpro.      Def ::= TDir ;
+DKPpro.     Def ::= [KWord] TDir;
+DFun.       Def ::= Func ;
+DKFun.      Def ::= [KWord] Func ;
+DStruct.    Def ::= Strct ;
+DKStruct.   Def ::= [KWord] Strct ;
 
-separator   Arg "," ;
-ADecl.      Arg    ::= Type Id ;
-ADecl1.     Arg    ::= Type "&" Id ;
-ADecl4.     Arg    ::= Type "&" ;
-ADecl2.     Arg    ::= "const" Type "&" Id ;
-ADecl3.     Arg    ::= "const" Type Id ;
-ADecl5.     Arg    ::= "const" Type "&";
+-- Directivas de alto nivel
+DTDir.  TDir  ::= Type [Id] ";" ;
+DTDir1. TDir  ::= Type "&" Id ";" ;
+DTDir2. TDir  ::= Type "[" "]" Id  ";" ;
+DTDir3. TDir  ::= Type Id "[" "]" ";" ;
+DTDir4. TDir  ::= Type ";" ;
+DTDir5. TDir  ::= Type "&" Id "=" Exp ";" ;
+DTDir6. TDir  ::= Type Id "=" Exp ";" ;
+
+-- Funciones
+FFunc.  Func  ::= Type Id "(" [Arg] ")" ";" ;
+FFunc1. Func  ::= Type Id "(" [Arg] ")" "{" [Stm] "}" ;
 
 
+-- Argumentos de funciones
+separator Arg "," ;
+Test.  Arg ::= AIni;
+Test1. Arg ::= [KWord] AIni;
+
+-- Inicialización de argumentos
+AAIni.      AIni    ::= Type ;
+AAIni1.     AIni    ::= Type Id ;
+AAIni2.     AIni    ::= Type "&" Id ;
+AAIni3.     AIni    ::= Type "[" "]" Id ;
+AAIni4.     AIni    ::= Type "&" "[" "]" Id ;
+AAIni5.     AIni    ::= Type "&" ;
+AAIni6.     AIni    ::= Type Id "=" Exp;
+AAIni7.     AIni    ::= Type "&" Id "=" Exp;
+
+-- Sentencias
 terminator   Stm "" ;
+SStr.        Stm2 ::= Strct;
+SInit.       Stm2 ::= SIni ;
+SKInit.      Stm2 ::= [KWord] SIni ;
 SEmpt.       Stm1 ::= ";" ;
 SExp.        Stm1 ::= Exp ";" ;
-SQua.        Stm1 ::= Type [Id] ";" ;
-SInit.       Stm1 ::= Type Id "=" Exp ";" ;
-SReturn.     Stm1 ::= "return" Exp ";" ;
-SReturnVoid. Stm1 ::= "return" ";" ;
-SWhile.      Stm1 ::= "while" "(" Exp ")" Stm1 ;
 SBlock.      Stm1 ::= "{" [Stm] "}" ;
 SIfElse.     Stm1 ::= "if" "(" Exp ")" Stm1 "else" Stm1 ;
-SIf.         Stm ::= "if" "(" Exp ")" Stm1 ;ma
-STyped.      Stm1 ::= TDef ;
-coercions Stm 1 ;
+SIf.         Stm ::= "if" "(" Exp ")" Stm1 ;
+SReturn.     Stm ::= "return" Exp ";" ;
+SReturnVoid. Stm ::= "return" ";" ;
+SWhile.      Stm ::= "while" "(" Exp ")" Stm ;
+SDoWhile.    Stm ::= "do" Stm "while" "(" Exp ")" ";" ;
+SFor.        Stm ::= "for" "(" Stm1 Exp ";" Exp ")" Stm ;
+coercions Stm 2 ;
 
-TTDef. TDef ::= "typedef" Type Id ";" ;
 
+-- Estructuras
+SStrct.  Strct1 ::= "struct" Id "{" [SIni] "}" [Id] ";" ;
+SStrct2. Strct  ::= "struct" Id "{" [SIni] "}" ";" ;
+coercions Strct 1;
+
+-- Inicialización de sentencias
+terminator SIni "" ;
+SSIni.      SIni ::= Type Id "[" Exp "]" ";" ;
+SSIni1.     SIni ::= Type Id "=" Exp ";" ;
+SSIni2.     SIni ::= Type "&" Id "=" Exp ";" ;
+SSIni3.     SIni ::= Type "&" Id ";" ;
+SSIni4.     SIni ::= Type [Id] ";" ;
+
+
+
+-- Expresiones
 separator Exp "," ;
 ETrue.    Exp16  ::= "true" ;
 EFalse.   Exp16  ::= "false" ;
@@ -44,8 +82,9 @@ EInt.     Exp16  ::= Integer ;
 EChar.    Exp16  ::= Char ;
 EDouble.  Exp16  ::= Double ;
 EString.  Exp16  ::= [Str] ;
+EQual.    Exp15  ::= Qua ;
+EId.      Exp15  ::= Id ;
 EIdx.     Exp15  ::= Id "[" Exp "]" ;
-EQual.    Exp15  ::= Type ; -- Esto no es convincente.
 ECall.    Exp15  ::= Id "(" [Exp] ")" ;
 EAProj.   Exp14 ::=  Exp14 "->" Exp15;
 EProj.    Exp14  ::= Exp14 "." Exp15;
@@ -62,7 +101,6 @@ EPlus.    Exp11  ::= Exp11 "+"  Exp12 ;
 EMinus.   Exp11  ::= Exp11 "-"  Exp12 ;
 ELShif.   Exp10  ::= Exp10 "<<" Exp11 ;
 ERShif.   Exp10  ::= Exp10 ">>" Exp11 ;
-ELt.      Exp9   ::= Exp9  "<"  Exp10 ;
 EGt.      Exp9   ::= Exp9  ">"  Exp10 ;
 ELtEq.    Exp9   ::= Exp9  "<=" Exp10 ;
 EGtEq.    Exp9   ::= Exp9  ">=" Exp10 ;
@@ -79,19 +117,32 @@ coercions Exp 16 ;
 separator nonempty Str "" ;
 Strlst. Str ::= String;
 
-DTempl. Templ ::= Id "<" [Type] ">" ;
+-- Tipos generales
+TType.   Type ::= IType ;
+TQua.    Type ::= Qua ;
 
-separator nonempty Type "," ;
-TType.      Type ::= [Qua] ;
+-- Palabras calificadas
+separator nonempty Qua "," ;
+QQua.    Qua ::= IType "::" IType ;
+QQuaLst. Qua ::= IType "::" Qua ;
 
-separator nonempty Qua "::"; 
-QTemp.      Qua ::= Templ ;
-QId.        Qua ::= Id ;
-TBool.      Qua ::= "bool" ;
-TDouble.    Qua ::= "double" ;
-TInt.       Qua ::= "int" ;
-TString.    Qua ::= "string" ;
-TVoid.      Qua ::= "void" ;
+separator nonempty IType "," ;
+IChar.      IType ::= "char" ;
+IVoid.      IType ::= "void" ;
+IBool.      IType ::= "bool" ;
+IDouble.    IType ::= "double" ;
+IInt.       IType ::= "int" ;
+IString.    IType ::= "string" ;
+ITemp.      IType ::= Id "<" [Qua] ">" ;
+ITemp2.     IType ::= Id "<" [IType] ">" ;
+IId.        IType ::= Id;
+
+-- Palabras reservadas
+separator  nonempty  KWord " " ;
+KWTdef.      KWord ::= "typedef" ;
+KWCons.      KWord ::= "const" ;
+KWUsing.     KWord ::= "using" ;
+KWInline.    KWord ::= "inline" ;
 
 separator nonempty Id "," ;
 token Id (letter (letter | digit | '_')*) ;

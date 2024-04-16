@@ -4,8 +4,14 @@
 *.hi
 *.o
 *.x
-Makefile
 *.y
 *.exe
 *.sh
 *.info
+*.cc
+*.txt
+
+Makefile
+lab1-test-dir
+good
+bad
