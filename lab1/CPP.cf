@@ -1,3 +1,5 @@
+-- Ricardo Rolín 279404
+
 comment "#" ;
 comment "//" ;
 comment "/*" "*/" ;
@@ -48,7 +50,7 @@ AAIni7.     AIni    ::= Type "&" Id "=" Exp;
 
 -- Sentencias
 terminator   Stm "" ;
-SStr.        Stm2 ::= Strct;
+SStr.        Stm2 ::= Strut_aux ";";
 SInit.       Stm2 ::= SIni ;
 STDef.       Stm2 ::= TDef ;
 SEmpt.       Stm1 ::= ";" ;
@@ -68,8 +70,9 @@ TTDef1. TDef ::= "typedef" Strct ;
 TTDef2.  TDef ::= "typedef" Type "[" "]" Id ";" ;
 
 -- Estructuras
-SStrct.  Strct1 ::= "struct" Id "{" [SIni] "}" [Id] ";" ;
-SStrct2. Strct  ::= "struct" Id "{" [SIni] "}" ";" ;
+SStrct.  Strct1 ::= Strut_aux [Id] ";" ;
+SStrct2. Strct  ::= Strut_aux ";" ;
+SStruc.  Strut_aux ::= "struct" Id "{" [SIni] "}" ;
 coercions Strct 1;
 
 -- Inicialización de sentencias
