@@ -1,10 +1,12 @@
 # Lenguajes y Compiladores - Primer semestre de 2024
 
-En este repositorio se agregan los laboratorios de construcción de un compilador.
-
-El libro de referencia usado para estos laboratorios es "Implementing Programming Languages" de Aarne Ranta.
-
-Website del libro: <https://www.grammaticalframework.org/ipl-book>
+En este repositorio se implementan las tareas planteadas en el libro [Implementing Programming Languages - Aarne Ranta](https://www.grammaticalframework.org/ipl-book):
+* [1. Parser para C++](https://www.grammaticalframework.org/ipl-book/assignments/assignment1/assignment1.html)
+* [2. Verificador de típos para C++](https://www.grammaticalframework.org/ipl-book/assignments/assignment2/assignment2.html)
+* [3. Intérprete para C++](https://www.grammaticalframework.org/ipl-book/assignments/assignment3/assignment3.html)
+* [4. Generador de código para C++](https://www.grammaticalframework.org/ipl-book/assignments/assignment4/assignment4.html)
+* [5. Intérprete para Fun](https://www.grammaticalframework.org/ipl-book/assignments/assignment5/assignment5.html)
+* [6. Un lenguaje de propósito especial](https://www.grammaticalframework.org/ipl-book/assignments/assignment6/assignment6.html)
 
 ## Dependencias
 
