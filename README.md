@@ -1,6 +1,8 @@
-# Lenguajes y Compiladores - Primer semestre de 2024
+# Laboratorio: Implementando lenguajes de programación
 
-En este repositorio se implementan las tareas planteadas en el libro [Implementing Programming Languages - Aarne Ranta](https://www.grammaticalframework.org/ipl-book):
+En este repositorio se implementan las tareas planteadas en el libro "Implementing Programming Languages" de Aarne Ranta ([website del libro](https://www.grammaticalframework.org/ipl-book)).
+
+Tareas:
 1. [Parser para C++](https://www.grammaticalframework.org/ipl-book/assignments/assignment1/assignment1.html)
 2. [Verificador de típos para C++](https://www.grammaticalframework.org/ipl-book/assignments/assignment2/assignment2.html)
 3. [Intérprete para C++](https://www.grammaticalframework.org/ipl-book/assignments/assignment3/assignment3.html)
