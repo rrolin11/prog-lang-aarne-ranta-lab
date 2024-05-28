@@ -16,6 +16,7 @@ fail = Bad
 #endif
 
 type Env = (Sig,[Context])
+
 type Sig = Map Id ([Type],Type)
 type Context = Map Id Type
 
@@ -35,4 +36,4 @@ newBlock :: Env -> Env
 newBlock = undefined
 
 emptyEnv :: Env
-emptyEnv = undefined
+emptyEnv = (Map.empty, [])
