@@ -12,14 +12,25 @@ import Prelude hiding (fail)
 #endif
 
 typecheck :: Program -> Err ()
-typecheck p = fail "no implementado" 
+typecheck p = do 
+    env <- emptyEnv
+    return checkProg env p
 
 checkProg :: Env -> Program -> Err ()
-checkProg env prog = do
+checkProg env prog = case prog of
+    [] -> fail $ "el programa es vacío"
+    defs -> return checkDefs env defs
 
+checkDefs :: Env -> [Def] -> Err ()
+checkDefs env defs = case defs of
+    [] -> fail $ "la lista de definiciones es vacía"
+    def:[] -> checkDef env def
+    def:defs -> -- IMPLEMENTAR
 
 checkDef :: Env -> Def -> Err ()
-checkDef = undefined
+checkDef env def -> case def of 
+    DFun type id args stms -> do 
+        updateFun env id -- IMPLEMENTAR
 
 inferExp :: Env -> Exp -> Err Type
 inferExp env x = case x of
@@ -36,7 +47,7 @@ inferBin types env exp1 exp2 = do
         then
             checkExp env exp2 typ
         else
-            fail $ "wrong type of expression " ++ printTree exp1
+            fail $ "tipo incorrecto en la expresión " ++ printTree exp1
 
 checkExp :: Env -> Type -> Exp -> Err ()
 checkExp env typ exp = do
@@ -44,28 +55,45 @@ checkExp env typ exp = do
     if (typ2 = typ) then
         return ()
     else
-        fail $ "type of " ++ printTree exp ++
-        "expected " ++ printTree typ ++
+        fail $ "el tipo de " ++ printTree exp ++
+        "se esperaba " ++ printTree typ ++
+        "pero se encontró " ++ printTree typ2
 
 checkStms :: Type -> Env -> [Stm] -> Err Env
-checkStms = undefined
-
-checkStms :: Env-> [Stm]-> Err Env
-checkStms env stms = case stms of
-    []-> return env
-    x : rest-> do
-        env' <- checkStm env x
+checkStms type env stms = case stms of
+    [] -> return env
+    x:rest -> do
+        env' <- checkStm type env x
         checkStms env' rest
 
-checkStm :: Env -> Type -> Stm -> Err Env
-checkStm env val x = case x of
+checkStm :: Type -> Env -> Stm -> Err Env
+checkStm type env x = case x of
     SExp exp -> do
         inferExp env exp
         return env
-    SDecl typ x ->
+    SDecls typ x ->
         updateVar env id typ
-    SWhile exp stm-> do
+        return env
+    SInit typ id exp -> do
+        updateVar env id typ
+        checkExp env typ exp
+        return env
+    SReturn exp -> do
+        checkExp env type exp
+        return env
+    SReturnVoid -> do 
+        checkExp env Type_void exp
+        return env
+    SWhile exp stm -> do
         checkExp env Type_bool exp
-        checkStm env val stm
-
-checkFun :: Env -> Def -> Err ()
+        checkStm env type stm
+        return env
+    SBlock stms -> do
+        env' <- newBlock env
+        checkStms type env' stms
+        return env
+    SIfElse exp stm estm -> do 
+        checkExp env Type_bool Exp
+        checkStm type env stm
+        checkStm type env estm
+        return env
