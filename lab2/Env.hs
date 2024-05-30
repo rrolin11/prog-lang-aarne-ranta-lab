@@ -15,48 +15,43 @@ import Control.Monad hiding (fail)
 fail = Bad
 #endif
 
-type Env = (Sig,[Context])
+type Env = (Sig, [Context])
 type Sig = Map Id ([Type],Type)
 type Context = Map Id Type
 
 lookupVar :: Env -> Id -> Err Type
-lookupVar (_, []) id = fail $ "el contexto es vacío" ++ printTree id ++ "."
-lookupVar (sig, ctx:ctxs) id = case Map.lookup id ctx of
-                    Nothing   -> lookupVar (sig, ctxs) id
-                    Just type -> return type
+lookupVar (s, []) id = fail $ "el contexto es vacío";
+lookupVar (s, ctx:ctxs) id = case Map.lookup id ctx of
+                    Nothing -> lookupVar (s, ctxs) id
+                    Just t  -> return t
 
 lookupFun :: Env -> Id -> Err ([Type], Type)
-lookupFun (Map.empty, []) _ = fail $ "el entorno es vacío" ++ printTree id ++ "."
-lookupFun (sig, ctx:ctxs) id = case Map.lookup id sig of
-                    Nothing -> fail $ "la función no se encontró" ++ printTree id ++ "."
+lookupFun (sig, _) id = case Map.lookup id sig of
+                    Nothing -> fail $ "la función " ++ printTree id ++ "no se encontró"
                     Just fun -> return fun
 
 updateVar :: Env -> [Id] -> Type -> Err Env
-updateVar (_, []) [] type = fail $ "la declaración ya existe en este contexto"
-updateVar (_, []) id:[] type = return (_, [Map.insert id type []])
-updateVar (_, []) id:ids type = updateVar (_, [Map.insert id type []]) ids type
-updateVar (_, ctx:ctxs) id:[] type = case Map.lookup id ctx of
-                    Nothing -> return (_, (Map.insert id type ctx):ctxs)
-                    Just type -> fail $ "la declaración ya existe en este contexto" ++ 
-                    printTree x ++ "."    
-updateVar (_, ctx:ctxs) id:ids type = case Map.lookup id ctx of
-                    Nothing -> updateVar (_, [Map.insert id type ctx]:ctxs) ids type
-                    Just type -> fail $ "la declaración ya existe en este contexto" ++ 
-                    printTree x ++ "."    
+updateVar (_, []) [] _ = fail $ "la lista de identificadores es vacía"
+updateVar (s, []) (id:[]) typ = return (s, [Map.insert id typ empty])
+updateVar (s, []) (id:ids) typ = updateVar (s, [Map.insert id typ empty]) ids typ
+updateVar (s, ctx:ctxs) (id:[]) typ = case Map.lookup id ctx of
+                    Nothing -> return (s, (Map.insert id typ ctx):ctxs)
+                    Just t -> fail $ "la declaración de variable " ++ printTree id ++ "ya existe en este contexto"
+updateVar (s, ctx:ctxs) (id:ids) typ = case Map.lookup id ctx of
+                    Nothing -> updateVar (s, (Map.insert id typ ctx):ctxs) ids typ
+                    Just t -> fail $ "la declaración de variable " ++ printTree id ++ "ya existe en este contexto"
 
 updateFun :: Env -> Id -> ([Type],Type) -> Err Env
-updateFun (Map.empty, ctx) id (types, type) = return ((Map.insert id (types, type) Map.empty), ctx)
-updateFun (sig, ctx) id (types, type) = case Map.lookup id sig of
-                    Nothing -> return ((Map.insert id (types, type) sig), ctx)
+updateFun (sig, ctx) id (types, typ) = case Map.lookup id sig of
+                    Nothing -> return ((Map.insert id (types, typ) sig), ctx)
                     Just (types2, type2) -> do
-                        if (type2 != type && types2 != types) then
-                            return ((Map.insert id (types, type) sig), ctx)
+                        if (type2 /= typ && types2 /= types) then
+                            return ((Map.insert id (types, typ) sig), ctx)
                         else 
-                            fail $ "la función ya existe en el mapa de firmas" ++ 
-                            printTree id ++ "."   
+                            fail $ "la función " ++ printTree id ++ "ya existe en el mapa de firmas"
 
 newBlock :: Env -> Env
-newBlock (sig, ctx) -> return (sig, []:ctx)
+newBlock (sig, ctx) = (sig, (empty):ctx)
 
 emptyEnv :: Env
-emptyEnv = (Map.empty, [])
+emptyEnv = (empty, [])
