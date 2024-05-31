@@ -6,6 +6,7 @@ import AbsCPP
 import PrintCPP
 import ErrM
 import Env
+import Data.Either
 
 #if __GLASGOW_HASKELL__ >= 708 && __GLASGOW_HASKELL__ < 808
 import Prelude hiding (fail)
@@ -13,42 +14,50 @@ import Prelude hiding (fail)
 
 typecheck :: Program -> Err ()
 typecheck prog = case prog of
-    [] -> fail $ "el programa es vacío"
-    defs -> do 
-        env <- emptyEnv
-        return checkProg env prog
+    PDefs [] -> fail $ "el programa es vacío"
+    PDefs defs -> do 
+        let env = emptyEnv
+        checkProg env prog
 
-loadFunctionToEnv :: [Def] -> Env -> Env
-loadFunctionToEnv [] env = env
-loadFunctionToEnv (DFun type id args stms):defs env = do
-        types <- [t | (ADecl t id) <- args]
-        env' <- updateFun env id (types,type)
-        loadFunctionToEnv defs env'
+loadFunctionToEnv :: [Def] -> Env -> Err Env
+loadFunctionToEnv [] env = Right env
+loadFunctionToEnv ((DFun typ id args stms):defs) env = do
+        let types = [t | (ADecl t id) <- args]
+        case updateFun env id (types, typ) of
+            Right env' -> loadFunctionToEnv defs env'
+            Left err -> Left err
 
 checkProg :: Env -> Program -> Err ()
 checkProg env prog = case prog of
-    [] -> fail $ "el programa es vacío"
-    defs -> do 
-        env <- loadFunctionToEnv defs env
-        checkDefs env defs
+    PDefs [] -> fail $ "el programa es vacío"
+    PDefs defs ->
+        case loadFunctionToEnv defs env of
+            Right env' -> 
+                case checkDefs env' defs of
+                    Right ret -> Right ret
+                    Left err -> Left err
+            Left err -> Left err
 
 checkDefs :: Env -> [Def] -> Err ()
-checkDefs env defs = case defs of
-    env [] -> ()
-    env def:defs -> do
-        _ <- checkDef env def
-        checkDefs env defs
+checkDefs env defs =
+    case defs of
+        [] -> return ()
+        def:defs -> do
+            _ <- checkDef env def
+            checkDefs env defs
 
-loadArgsToEnv :: [Arg] -> Env -> Env
-loadArgsToEnv [] env = env
-loadArgsToEnv (ADecl type id):args env = do
-        env' <- updateVar env [id] type
-        loadArgsToEnv args env'
+loadArgsToEnv :: [Arg] -> Env -> Err Env
+loadArgsToEnv [] env = Right env
+loadArgsToEnv ((ADecl typ id):args) env =
+    case updateVar env [id] typ of
+        Right env' -> loadArgsToEnv args env'
+        Left err -> Left err
+        
 
 checkDef :: Env -> Def -> Err ()
-checkDef env (DFun type id args stms) = do
+checkDef env (DFun typ id args stms) = do
     env' <- loadArgsToEnv args env
-    _ <- checkStms type env' stms
+    _ <- checkStms typ env' stms
     return ()
     
 inferExp :: Env -> Exp -> Err Type
@@ -59,13 +68,15 @@ inferExp env x = case x of
     EDouble n -> return Type_double
     EString s -> return Type_string
     EId id -> lookupVar env id 
-    EApp id exps -> do
-       (types,type) <- lookupFun env id
-       typesExp <- [inferExp env e | e <- exps]
-       if (types == typesExp) then
-            return type
-       else
-            fail $ "alguno de los tipos no coincide"   
+    EApp id exps ->
+        case lookupFun env id of
+            Right (types, typ) -> do
+                let typesExp = rights [inferExp env e | e <- exps]
+                if (types == typesExp) then
+                        Right typ
+                else
+                        Left $ "alguno de los tipos no coincide"
+            Left err -> Left err       
     EPIncr exp -> inferExp env exp
     EPDecr exp -> inferExp env exp
     EIncr exp -> inferExp env exp
@@ -74,90 +85,119 @@ inferExp env x = case x of
     EDiv exp1 exp2 -> inferBin [Type_int, Type_double, Type_string] env exp1 exp2
     EPlus exp1 exp2 -> inferBin [Type_int, Type_double, Type_string] env exp1 exp2
     EMinus exp1 exp2 -> inferBin [Type_int, Type_double, Type_string] env exp1 exp2
-    ELt exp1 exp2 -> do
-        _ <- inferBin [Type_int, Type_double, Type_string] env exp1 exp2
-        return Type_bool
-    EGt exp1 exp2 -> do
-        _ <- inferBin [Type_int, Type_double, Type_string] env exp1 exp2
-        return Type_bool
-    ELtEq exp1 exp2 -> do
-        _ <- inferBin [Type_int, Type_double, Type_string] env exp1 exp2
-        return Type_bool
-    EGtEq exp1 exp2 -> do
-        _ <- inferBin [Type_int, Type_double, Type_string] env exp1 exp2
-        return Type_bool
-    EEq exp1 exp2 -> do
-        _ <- inferBin [Type_int, Type_double, Type_string] env exp1 exp2
-        return Type_bool
-    ENEq exp1 exp2 -> do
-        _ <- inferBin [Type_int, Type_double, Type_string] env exp1 exp2
-        return Type_bool
-    EAnd exp1 exp2 -> do
-        _ <- inferBin [Type_bool] env exp1 exp2
-        return Type_bool
-    EOr exp1 exp2 -> do
-        _ <- inferBin [Type_bool] env exp1 exp2
-        return Type_bool
-    EAss exp1 exp2 -> do
-        _ <- inferBin [Type_int, Type_double, Type_string] env exp1 exp2
-        inferExp env exp1
-    ETyped exp type -> fail $ "Fallo del ETyped "
+    ELt exp1 exp2 -> 
+        case inferBin [Type_int, Type_double, Type_string] env exp1 exp2 of
+            Right _ -> Right Type_bool
+            Left err -> Left err
+    EGt exp1 exp2 ->
+        case inferBin [Type_int, Type_double, Type_string] env exp1 exp2 of
+            Right _ -> Right Type_bool
+            Left err -> Left err
+    ELtEq exp1 exp2 ->
+        case inferBin [Type_int, Type_double, Type_string] env exp1 exp2 of
+            Right _ -> Right Type_bool
+            Left err -> Left err
+    EGtEq exp1 exp2 ->
+        case inferBin [Type_int, Type_double, Type_string] env exp1 exp2 of
+            Right _ -> Right Type_bool
+            Left err -> Left err
+    EEq exp1 exp2 ->
+        case inferBin [Type_int, Type_double, Type_string] env exp1 exp2 of
+            Right _ -> Right Type_bool
+            Left err -> Left err
+    ENEq exp1 exp2 ->
+        case inferBin [Type_int, Type_double, Type_string] env exp1 exp2 of
+            Right _ -> Right Type_bool
+            Left err -> Left err
+    EAnd exp1 exp2 ->
+        case inferBin [Type_bool] env exp1 exp2 of
+            Right _ -> Right Type_bool
+            Left err -> Left err
+    EOr exp1 exp2 ->
+        case inferBin [Type_bool] env exp1 exp2 of
+            Right _ -> Right Type_bool
+            Left err -> Left err
+    EAss exp1 exp2 ->
+        case inferBin [Type_int, Type_double, Type_string] env exp1 exp2 of
+            Right _ -> inferExp env exp1
+            Left err -> Left err
+    ETyped exp typ -> Left $ "Fallo del ETyped "
 
 
 checkExp :: Env -> Type -> Exp -> Err ()
-checkExp env typ exp = do
-    typ2 <- inferExp env exp
-    if (typ2 = typ) then
-        return ()
-    else
-        fail $ "el tipo de " ++ printTree exp ++
-        "se esperaba " ++ printTree typ ++
-        "pero se encontró " ++ printTree typ2
+checkExp env typ exp =
+    case inferExp env exp of
+        Right typ2 -> do
+            if (typ2 == typ) then
+                Right ()
+            else
+                Left $ "el tipo de " ++ printTree exp ++
+                "se esperaba " ++ printTree typ ++
+                "pero se encontró " ++ printTree typ2
+        Left err -> Left err
 
 inferBin :: [Type] -> Env -> Exp -> Exp -> Err Type
-inferBin types env exp1 exp2 = do
-    typ <- inferExp env exp1
-    if elem typ types
-        then
-            checkExp env exp2 typ
-        else
-            fail $ "tipo incorrecto en la expresión " ++ printTree exp1
+inferBin types env exp1 exp2 =
+    case inferExp env exp1 of
+        Right typ -> do
+            if elem typ types
+                then
+                    case checkExp env typ exp2 of
+                        Right _ -> Right typ
+                        Left err -> Left err
+                else
+                    Left $ "tipo incorrecto en la expresión " ++ printTree exp1
+        Left err -> Left err
 
 checkStms :: Type -> Env -> [Stm] -> Err Env
-checkStms type env stms = case stms of
-    [] -> return env
-    x:rest -> do
-        env' <- checkStm type env x
-        checkStms env' rest
+checkStms typ env stms =
+    case stms of
+        [] -> Right env
+        s:ss -> case checkStm typ env s of
+            Right env' -> checkStms typ env ss
+            Left err -> Left err
 
 checkStm :: Type -> Env -> Stm -> Err Env
-checkStm type env x = case x of
-    SExp exp -> do
-        inferExp env exp
-        return env
-    SDecls typ x ->
-        updateVar env id typ
-        return env
-    SInit typ id exp -> do
-        updateVar env id typ
-        checkExp env typ exp
-        return env
-    SReturn exp -> do
-        checkExp env type exp
-        return env
-    SReturnVoid -> do 
-        checkExp env Type_void exp
-        return env
-    SWhile exp stm -> do
-        checkExp env Type_bool exp
-        checkStm env type stm
-        return env
+checkStm typ env x = case x of    
+    SExp exp ->
+        case inferExp env exp of
+            Right _ -> Right env
+            Left err -> Left err
+    SDecls typ ids ->
+        case updateVar env ids typ of
+            Right env' -> Right env'
+            Left err -> Left err
+    SInit typ id exp ->
+        case updateVar env [id] typ of
+            Right env' ->
+                case checkExp env typ exp of
+                    Right _ -> Right env'
+                    Left err -> Left err
+            Left err -> Left err
+    SReturn exp ->
+        case checkExp env typ exp of
+            Right _ -> Right env
+            Left err -> Left err
+    SReturnVoid -> Right env
+    SWhile exp stm ->
+        case checkExp env Type_bool exp of
+            Right _ ->
+                case checkStm typ env stm of
+                    Right _ -> Right env
+                    Left err -> Left err
+            Left err -> Left err
     SBlock stms -> do
-        env' <- newBlock env
-        checkStms type env' stms
-        return env
-    SIfElse exp stm estm -> do 
-        checkExp env Type_bool Exp
-        checkStm type env stm
-        checkStm type env estm
-        return env
+        let env' = newBlock env
+        case checkStms typ env' stms of
+            Right _ -> Right env
+            Left err -> Left err
+    SIfElse exp istm estm ->
+        case checkExp env Type_bool exp of
+            Right _ ->
+                case checkStm typ env istm of
+                    Right _ ->
+                        case checkStm typ env estm of
+                            Right _ -> Right env
+                            Left err -> Left err
+                    Left err -> Left err
+            Left err -> Left err
