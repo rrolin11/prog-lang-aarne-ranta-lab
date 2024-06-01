@@ -29,21 +29,28 @@ lookupVar (s, ctx:ctxs) id =
 lookupFun :: Env -> Id -> Err ([Type], Type)
 lookupFun (sig, _) id = 
     case Map.lookup id sig of
-        Nothing -> Left $ "la función " ++ printTree id ++ "no se encontró"
+        Nothing -> Left $ "la función \"" ++ printTree id ++ "\" no se encontró o el mapa es vacío"
         Just fun -> Right fun
 
-updateVar :: Env -> [Id] -> Type -> Err Env
-updateVar (_, []) [] _ = Left $ "la lista de identificadores es vacía"
-updateVar (s, []) (id:[]) typ = Right (s, [Map.insert id typ empty])
-updateVar (s, []) (id:ids) typ = updateVar (s, [Map.insert id typ empty]) ids typ
-updateVar (s, ctx:ctxs) (id:[]) typ = 
+updateVars :: Env -> [Id] -> Type -> Err Env
+updateVars env [] typ = Right env
+updateVars env (id:ids) typ = 
+    case updateVar env id typ of
+        Right env' -> updateVars env' ids typ
+        Left err -> Left err
+
+{-
+Agrega una declaración de variable al contexto tope del stack. 
+Si ya existe, lanza un error. De otro modo, devuelve el entorno 
+actualizado con la nueva declaración.
+-} 
+updateVar :: Env -> Id -> Type -> Err Env
+updateVar (sig, []) id typ = Right (sig, [Map.insert id typ empty])
+updateVar (sig, ctx:ctxs) id typ = 
     case Map.lookup id ctx of
-        Nothing -> Right (s, (Map.insert id typ ctx):ctxs)
-        Just t -> Left $ "la declaración de variable " ++ printTree id ++ "ya existe en este contexto"
-updateVar (s, ctx:ctxs) (id:ids) typ = 
-    case Map.lookup id ctx of
-        Nothing -> updateVar (s, (Map.insert id typ ctx):ctxs) ids typ
-        Just t -> Left $ "la declaración de variable " ++ printTree id ++ "ya existe en este contexto"
+        Nothing -> Right (sig, (Map.insert id typ ctx):ctxs)
+        Just v -> Left $ "la declaración de variable \"" ++ printTree typ ++ 
+                    " " ++ printTree id ++ "\" ya existe en este contexto"
 
 updateFun :: Env -> Id -> ([Type],Type) -> Err Env
 updateFun (sig, ctx) id (types, typ) = 
@@ -53,7 +60,8 @@ updateFun (sig, ctx) id (types, typ) =
             if (type2 /= typ && types2 /= types) then
                 Right ((Map.insert id (types, typ) sig), ctx)
             else 
-                Left $ "la función " ++ printTree id ++ "ya existe en el mapa de firmas"
+                Left $ "la función \"" ++ printTree typ ++ 
+                    " " ++ printTree id ++ "\" ya existe en el mapa de firmas"
 
 newBlock :: Env -> Env
 newBlock (sig, ctx) = (sig, (empty):ctx)

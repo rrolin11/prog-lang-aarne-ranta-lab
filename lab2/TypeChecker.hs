@@ -7,17 +7,26 @@ import PrintCPP
 import ErrM
 import Env
 import Data.Either
+{-
+Se dejan comentadas lineas de debugging en el código 
+(ver documentación importación Debug.Trace)
+https://hackage.haskell.org/package/base-4.20.0.1/docs/Debug-Trace.html
+-}
+import Debug.Trace
 
 #if __GLASGOW_HASKELL__ >= 708 && __GLASGOW_HASKELL__ < 808
 import Prelude hiding (fail)
 #endif
 
+
 typecheck :: Program -> Err ()
 typecheck prog = case prog of
     PDefs [] -> fail $ "el programa es vacío"
-    PDefs defs -> do 
+    PDefs defs -> do
         let env = emptyEnv
-        checkProg env prog
+        case checkProg env prog of
+            Right _ -> Ok ()
+            Left err -> Bad err
 
 loadFunctionToEnv :: [Def] -> Env -> Err Env
 loadFunctionToEnv [] env = Right env
@@ -28,11 +37,9 @@ loadFunctionToEnv ((DFun typ id args stms):defs) env = do
             Left err -> Left err
 
 checkProg :: Env -> Program -> Err ()
-checkProg env prog = case prog of
-    PDefs [] -> fail $ "el programa es vacío"
-    PDefs defs ->
+checkProg env (PDefs defs) = 
         case loadFunctionToEnv defs env of
-            Right env' -> 
+            Right env' -> do
                 case checkDefs env' defs of
                     Right ret -> Right ret
                     Left err -> Left err
@@ -41,24 +48,30 @@ checkProg env prog = case prog of
 checkDefs :: Env -> [Def] -> Err ()
 checkDefs env defs =
     case defs of
-        [] -> return ()
+        [] -> Right ()
         def:defs -> do
-            _ <- checkDef env def
-            checkDefs env defs
+            --traceM ("DEBUG [checkDefs]: " ++ show env)
+            case checkDef env def of
+                Right _ -> checkDefs env defs
+                Left err -> Left err
 
 loadArgsToEnv :: [Arg] -> Env -> Err Env
 loadArgsToEnv [] env = Right env
 loadArgsToEnv ((ADecl typ id):args) env =
-    case updateVar env [id] typ of
+    case updateVars env [id] typ of
         Right env' -> loadArgsToEnv args env'
         Left err -> Left err
         
 
 checkDef :: Env -> Def -> Err ()
-checkDef env (DFun typ id args stms) = do
-    env' <- loadArgsToEnv args env
-    _ <- checkStms typ env' stms
-    return ()
+checkDef env (DFun typ id args stms) =
+    case loadArgsToEnv args env of
+        Right env' -> do
+            --traceM ("DEBUG [checkDef]: " ++ show env')
+            case checkStms typ env' stms of
+                Right _ -> Right ()
+                Left err -> Left err        
+        Left err -> Left err
     
 inferExp :: Env -> Exp -> Err Type
 inferExp env x = case x of
@@ -75,7 +88,9 @@ inferExp env x = case x of
                 if (types == typesExp) then
                         Right typ
                 else
-                        Left $ "alguno de los tipos no coincide"
+                        Left $ "Los argumentos pasados \"" ++ printTree typesExp ++
+                            "\" en la expresión \"" ++ printTree x ++
+                            "\" no coinciden con la firma de la función \"" ++ printTree id 
             Left err -> Left err       
     EPIncr exp -> inferExp env exp
     EPDecr exp -> inferExp env exp
@@ -121,7 +136,7 @@ inferExp env x = case x of
         case inferBin [Type_int, Type_double, Type_string] env exp1 exp2 of
             Right _ -> inferExp env exp1
             Left err -> Left err
-    ETyped exp typ -> Left $ "Fallo del ETyped "
+    ETyped exp typ -> Left $ "Fallo del ETyped"
 
 
 checkExp :: Env -> Type -> Exp -> Err ()
@@ -146,7 +161,8 @@ inferBin types env exp1 exp2 =
                         Right _ -> Right typ
                         Left err -> Left err
                 else
-                    Left $ "tipo incorrecto en la expresión " ++ printTree exp1
+                    Left $ "tipo incorrecto en la expresión \"" ++ printTree exp1 ++
+                        "\" se esperaba el tipo" ++ printTree typ
         Left err -> Left err
 
 checkStms :: Type -> Env -> [Stm] -> Err Env
@@ -154,21 +170,23 @@ checkStms typ env stms =
     case stms of
         [] -> Right env
         s:ss -> case checkStm typ env s of
-            Right env' -> checkStms typ env ss
+            Right env' -> checkStms typ env' ss
             Left err -> Left err
 
 checkStm :: Type -> Env -> Stm -> Err Env
-checkStm typ env x = case x of    
+checkStm typ env x = --do
+    --traceM ("DEBUG [checkStm]: Check sentencia " ++ show x ++ " en el entorno " ++ show env);
+    case x of    
     SExp exp ->
         case inferExp env exp of
             Right _ -> Right env
             Left err -> Left err
     SDecls typ ids ->
-        case updateVar env ids typ of
+        case updateVars env ids typ of
             Right env' -> Right env'
             Left err -> Left err
     SInit typ id exp ->
-        case updateVar env [id] typ of
+        case updateVar env id typ of
             Right env' ->
                 case checkExp env typ exp of
                     Right _ -> Right env'
