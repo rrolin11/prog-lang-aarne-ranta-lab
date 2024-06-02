@@ -1,7 +1,6 @@
 {-# OPTIONS_GHC -cpp #-}
 
 -- GHC needs -threaded
-
 import Control.Concurrent
 import Control.Monad
 import Data.Char
