@@ -1,17 +1,14 @@
 *.bak
 *.txt
-*.hs
-*.hi
-*.o
+*.info
+
+*.sh
+ 
 *.x
 *.y
+*.o
+*.hi
 *.exe
-*.sh
-*.info
-*.cc
-*.txt
 
 Makefile
 lab1-test-dir
-good
-bad
