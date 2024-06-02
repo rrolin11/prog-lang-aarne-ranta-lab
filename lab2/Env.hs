@@ -57,7 +57,7 @@ updateFun (sig, ctx) id (types, typ) =
     case Map.lookup id sig of
         Nothing -> Right ((Map.insert id (types, typ) sig), ctx)
         Just (types2, type2) -> do
-            if (type2 /= typ && types2 /= types) then
+            if (type2 == typ && types2 /= types) then
                 Right ((Map.insert id (types, typ) sig), ctx)
             else 
                 Left $ "La función \"" ++ printTree typ ++ 
