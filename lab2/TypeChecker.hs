@@ -12,7 +12,7 @@ Se dejan comentadas lineas de debugging en el código
 (ver documentación importación Debug.Trace)
 https://hackage.haskell.org/package/base-4.20.0.1/docs/Debug-Trace.html
 -}
-import Debug.Trace
+--import Debug.Trace
 
 #if __GLASGOW_HASKELL__ >= 708 && __GLASGOW_HASKELL__ < 808
 import Prelude hiding (fail)
@@ -90,12 +90,52 @@ inferExp env x = case x of
                 else
                         Left $ "Los argumentos pasados \"" ++ printTree typesExp ++
                             "\" en la expresión \"" ++ printTree x ++
-                            "\" no coinciden con la firma de la función \"" ++ printTree id 
+                            "\" no coinciden con la firma de la función \"" ++ printTree id ++ "\"."
             Left err -> Left err       
-    EPIncr exp -> inferExp env exp
-    EPDecr exp -> inferExp env exp
-    EIncr exp -> inferExp env exp
-    EDecr exp -> inferExp env exp
+    EPIncr exp ->
+        case inferExp env exp of
+            Right typ -> 
+                if elem typ [Type_int, Type_double] 
+                    then 
+                        Right typ 
+                    else 
+                        Left $ "No es posible realizar un pre-incremento a la expresión \"" ++ 
+                        printTree exp ++ "\" de tipo \"" ++ printTree typ ++"\"" ++
+                        " Se esperaba el tipo Int o Double."
+            Left err -> Left err
+    EPDecr exp ->
+        case inferExp env exp of
+            Right typ -> 
+                if elem typ [Type_int, Type_double] 
+                    then 
+                        Right typ 
+                    else 
+                        Left $ "No es posible realizar un pre-decremento a la expresión \"" ++ 
+                        printTree exp ++ "\" de tipo \"" ++ printTree typ ++"\"" ++
+                        " Se esperaba el tipo Int o Double."
+            Left err -> Left err
+    EIncr exp -> 
+        case inferExp env exp of
+            Right typ -> 
+                if elem typ [Type_int, Type_double] 
+                    then 
+                        Right typ 
+                    else 
+                        Left $ "No es posible realizar un incremento a la expresión \"" ++ 
+                        printTree exp ++ "\" de tipo \"" ++ printTree typ ++"\"" ++
+                        " Se esperaba el tipo Int o Double."
+            Left err -> Left err
+    EDecr exp ->
+        case inferExp env exp of
+            Right typ -> 
+                if elem typ [Type_int, Type_double] 
+                    then 
+                        Right typ 
+                    else 
+                        Left $ "No es posible realizar un decremento a la expresión \"" ++ 
+                        printTree exp ++ "\" de tipo \"" ++ printTree typ ++"\"" ++
+                        " Se esperaba el tipo Int o Double."
+            Left err -> Left err
     ETimes exp1 exp2 -> inferBin [Type_int, Type_double, Type_string] env exp1 exp2
     EDiv exp1 exp2 -> inferBin [Type_int, Type_double, Type_string] env exp1 exp2
     EPlus exp1 exp2 -> inferBin [Type_int, Type_double, Type_string] env exp1 exp2
@@ -136,7 +176,7 @@ inferExp env x = case x of
         case inferBin [Type_int, Type_double, Type_string] env exp1 exp2 of
             Right _ -> inferExp env exp1
             Left err -> Left err
-    ETyped exp typ -> Left $ "Fallo del ETyped"
+    ETyped exp typ -> Left $ "Fallo del ETyped."
 
 
 checkExp :: Env -> Type -> Exp -> Err ()
@@ -146,9 +186,9 @@ checkExp env typ exp =
             if (typ2 == typ) then
                 Right ()
             else
-                Left $ "el tipo de " ++ printTree exp ++
-                "se esperaba " ++ printTree typ ++
-                "pero se encontró " ++ printTree typ2
+                Left $ "La expresión \"" ++ printTree exp ++ 
+                "\" de tipo \"" ++ printTree typ2 ++ "\" es ilegal." ++
+                " Se esperaba una de tipo \"" ++ printTree typ ++ "\"."
         Left err -> Left err
 
 inferBin :: [Type] -> Env -> Exp -> Exp -> Err Type
@@ -161,8 +201,8 @@ inferBin types env exp1 exp2 =
                         Right _ -> Right typ
                         Left err -> Left err
                 else
-                    Left $ "tipo incorrecto en la expresión \"" ++ printTree exp1 ++
-                        "\" se esperaba el tipo" ++ printTree typ
+                    Left $ "Tipo incorrecto en la expresión \"" ++ printTree exp1 ++
+                        "\". Se esperaba el tipo \"" ++ printTree typ ++ "\"."
         Left err -> Left err
 
 checkStms :: Type -> Env -> [Stm] -> Err Env

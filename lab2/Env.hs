@@ -20,7 +20,7 @@ type Sig = Map Id ([Type],Type)
 type Context = Map Id Type
 
 lookupVar :: Env -> Id -> Err Type
-lookupVar (s, []) id = fail $ "el contexto es vacío";
+lookupVar (s, []) id = fail $ "La variable \"" ++ printTree id ++ "\" no ha sido declarada en este ámbito.";
 lookupVar (s, ctx:ctxs) id = 
     case Map.lookup id ctx of
         Nothing -> lookupVar (s, ctxs) id
@@ -29,7 +29,7 @@ lookupVar (s, ctx:ctxs) id =
 lookupFun :: Env -> Id -> Err ([Type], Type)
 lookupFun (sig, _) id = 
     case Map.lookup id sig of
-        Nothing -> Left $ "la función \"" ++ printTree id ++ "\" no se encontró o el mapa es vacío"
+        Nothing -> Left $ "La función \"" ++ printTree id ++ "\" no ha sido declarada."
         Just fun -> Right fun
 
 updateVars :: Env -> [Id] -> Type -> Err Env
@@ -49,8 +49,8 @@ updateVar (sig, []) id typ = Right (sig, [Map.insert id typ empty])
 updateVar (sig, ctx:ctxs) id typ = 
     case Map.lookup id ctx of
         Nothing -> Right (sig, (Map.insert id typ ctx):ctxs)
-        Just v -> Left $ "la declaración de variable \"" ++ printTree typ ++ 
-                    " " ++ printTree id ++ "\" ya existe en este contexto"
+        Just v -> Left $ "La variable \"" ++ printTree typ ++ 
+                    " " ++ printTree id ++ "\" ya fue declarada en el scope."
 
 updateFun :: Env -> Id -> ([Type],Type) -> Err Env
 updateFun (sig, ctx) id (types, typ) = 
@@ -60,8 +60,8 @@ updateFun (sig, ctx) id (types, typ) =
             if (type2 /= typ && types2 /= types) then
                 Right ((Map.insert id (types, typ) sig), ctx)
             else 
-                Left $ "la función \"" ++ printTree typ ++ 
-                    " " ++ printTree id ++ "\" ya existe en el mapa de firmas"
+                Left $ "La función \"" ++ printTree typ ++ 
+                    " " ++ printTree id ++ "\" ha sido duplicada al declarar."
 
 newBlock :: Env -> Env
 newBlock (sig, ctx) = (sig, (empty):ctx)
