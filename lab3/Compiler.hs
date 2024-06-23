@@ -33,7 +33,7 @@ emptyEnv = Env { funs=Map.empty,
                  code=[]}
 
 emit :: Instruction -> State Env ()
-emit i = undefined
+emit i = modify (\s -> s {code = i : code s})
 
 typeSize :: Type -> Int
 typeSize Type_double = 2
@@ -81,7 +81,9 @@ lookupFun :: Id -> State Env FunType
 lookupFun i = undefined
 
 lookupVar :: Id -> State Env Int
-lookupVar i = undefined
+ lookupVar i = do
+ s <- get
+ -- then look up the first occurrence of x in (vars s)
 
 -- Entry point from ccpp.
 -- Arguments: cls is the class name and p is the typed embedded abstract syntax tree (returned by the type checker).
@@ -145,8 +147,3 @@ showDbl Lt     = "iflt "
 showDbl Gt     = "ifgt "
 showDbl Ge     = "ifge "
 showDbl Le     = "ifle "
-
-  
-
-
-
