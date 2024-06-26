@@ -172,7 +172,9 @@ compileInt 2 = emit $ "iconst_2"
 compileInt 3 = emit $ "iconst_3"
 compileInt 4 = emit $ "iconst_4"
 compileInt 5 = emit $ "iconst_5"
-compileInt i = emit $ "ldc " ++ i
+compileInt i 
+ | -256 <= i && i < 256 = emit $ "bipush " ++ i
+ otherwise = emit $ "ldc " ++ i
 
 compileDouble :: Double 
 compileDouble 0.0 = emit $ "dconst_0"
@@ -187,6 +189,7 @@ compileExp ETyped (EDouble d) _ = compileDouble d
 compileExp ETyped (EId i) t = do
   let address = lookupVar i
   case t of
+    Type_string -> emit $ "aload " ++ address
     Type_double -> emit $ "dload " ++ address
     _ -> emit $ "iload " ++ address
 compileExp ETyped (EApp id exps) = do
@@ -225,10 +228,10 @@ compileCmp c e1 e2 = do
   compileExp e1
   compileExp e2
   emit (show c ++ labelTrue)
-  emit "iconst_0"
+  emit $ "iconst_0"
   emit ("goto " ++ labelEnd)
   emit (labelTrue ++ ":")
-  emit "iconst_1"
+  emit $ "iconst_1"
   emit (labelEnd ++ ":")
 
 -- Hints: usefull auxiliary functions for comparations compilation
