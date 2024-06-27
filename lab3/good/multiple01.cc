@@ -5,6 +5,6 @@ void main () {
 	printInt(fun()) ;
 }
 
-int fun() {
+int fun(){
 	return 1 ;
 }
