@@ -9,6 +9,7 @@ import TypeChecker
 import qualified Data.Map as Map
 import Control.Monad
 import Control.Monad.Trans.State.Lazy
+import Data.Maybe
 --import Control.Monad.State
 
 type Instruction = String
@@ -44,11 +45,11 @@ extendVar t i = do
   s <- get
   let m:ms = vars s
   let a:as = maxvars s
-  put $ s {vars = (Map.insert i a m)}
+  put $ s {vars = (Map.insert i a m):ms}
   put $ s {maxvars = (a + (typeSize t)):as}
 
 extendArg :: Arg -> State Env ()
-extendArg (ADecl t i) -> extendVar t i
+extendArg (ADecl t i) = extendVar t i
 
 extendVars :: Type -> [Id] -> State Env ()
 extendVars _ [] = error $ "La lista de variables a extender es vacía."
@@ -71,7 +72,7 @@ funJVM i clas argty rty = "invokestatic " ++ clas ++"/" ++ funJVMType i argty rt
 extendFunEnv :: String -> FunType -> State Env ()
 extendFunEnv i ft = do
   s <- get
-  let m = Map.insert i ft (funs s)
+  let m = Map.insert (Id i) ft (funs s)
   put $ s {funs = m}
 
 extendDef :: String -> Def -> State Env ()
@@ -103,32 +104,31 @@ newLabel = do
   s <- get
   let lbl = labels s
   put $ s {labels = 1 + lbl}
-  return $ "L_" ++ show lbl
+  return $ "LBL" ++ show lbl
   
 lookupFun :: Id -> State Env FunType
 lookupFun i = do
   s <- get
-  return (fromJust Map.lookup i (funs s))
+  return $ fromJust $ Map.lookup i (funs s)
 
 findAddress :: Id -> [Map.Map Id Int] -> Int
-findAddress i [] = error $ "No se encontró el identificador de variable " ++ printTree i ++ "."
-findAddress i v:vs = case Map.lookup i v of 
-                Just address -> return address
+findAddress i [] = error $ "No se encontró el identificador de variable."
+findAddress i (v:vs) = case Map.lookup i v of 
+                Just address -> address
                 Nothing -> findAddress i vs
 
 lookupVar :: Id -> State Env Int
- lookupVar i = do
- s <- get
- return $ findAddress i (vars s)
+lookupVar i = do
+  s <- get
+  return $ findAddress i (vars s)
 
 -- Entry point from ccpp.
 -- Arguments: cls is the class name and p is the typed embedded abstract syntax tree (returned by the type checker).
 -- Hints: call compileP and run the State monad !
 compile :: String -> Program -> [Instruction]
 compile cls p = do 
-  execState State emptyEnv ()
-  s <- compileP cls p
-  return reverse (code s)
+  let s = execState (compileP cls p) emptyEnv
+  reverse (code s)
 
 compileP :: String -> Program -> State Env () 
 compileP cls (PDefs defs) = do
@@ -162,80 +162,140 @@ compileDef (DFun t (Id i) args stmts) = do
   emit ""
 
 compileStm :: Stm -> State Env ()
-compileStm stm = undefined
-
-compileInt :: Integer
-compileInt -1 = emit $ "iconst_m1"
-compileInt 0 = emit $ "iconst_0"
-compileInt 1 = emit $ "iconst_1"
-compileInt 2 = emit $ "iconst_2"
-compileInt 3 = emit $ "iconst_3"
-compileInt 4 = emit $ "iconst_4"
-compileInt 5 = emit $ "iconst_5"
-compileInt i 
- | -256 <= i && i < 256 = emit $ "bipush " ++ i
- otherwise = emit $ "ldc " ++ i
-
-compileDouble :: Double 
-compileDouble 0.0 = emit $ "dconst_0"
-compileDouble 1.0 = emit $ "dconst_1"
-compileDouble d = emit $ "ldc2_w " ++ d
+compileStm (SExp (ETyped e t)) = do
+  compileExp e  
+  case t of
+    Type_double -> emit $ "pop2"
+    _ -> emit $ "pop"
+compileStm (SDecls t ids) = do
+  extendVars t ids
+compileStm (SInit t id exp) = do
+  s <- get
+  let address = head (maxvars s)
+  extendVar t id
+  compileExp exp
+  compileStoreVar t address
+compileStm (SReturn (ETyped e t)) = do
+  compileExp e
+  case t of
+    Type_double -> do
+      emit $ "dreturn"
+    Type_string -> do
+      emit $ "areturn"
+    _ -> do
+      emit $ "ireturn"
+compileStm (SReturnVoid) = do
+  emit $ "return"
+compileStm (SWhile e s) = do
+  labelEnd <- newLabel
+  labelLoop <- newLabel
+  emit (labelLoop ++ ":")
+  compileExp e
+  emit ("ifeq " ++ labelEnd)
+  compileStm s
+  emit ("goto " ++ labelLoop)
+  emit (labelEnd ++ ":")
+compileStm (SIfElse e s1 s2) = do
+  labelFalse <- newLabel
+  labelEnd <- newLabel
+  compileExp e
+  emit ("ifeq " ++ labelFalse)
+  compileStm s1
+  emit ("goto " ++ labelEnd)
+  emit (labelFalse ++ ":")
+  compileStm s2
+  emit (labelEnd ++ ":")  
+compileStm (SBlock sms) = do
+  newBlock
+  mapM_ compileStm sms
+  exitBlock
 
 compileExp :: Exp -> State Env ()
-compileExp ETyped EFalse _ = emit $ "iconst_0"
-compileExp ETyped ETrue _ = emit $ "iconst_1"
-compileExp ETyped (EInt i) _ = compileInt i
-compileExp ETyped (EDouble d) _ = compileDouble d
-compileExp ETyped (EId i) t = do
-  let address = lookupVar i
-  case t of
-    Type_string -> emit $ "aload " ++ address
-    Type_double -> emit $ "dload " ++ address
-    _ -> emit $ "iload " ++ address
-compileExp ETyped (EApp id exps) = do
-  emit $ lookupFun id
+compileExp (ETyped EFalse t) = emit $ "iconst_0"
+compileExp (ETyped ETrue t) = emit $ "iconst_1"
+compileExp (ETyped (EInt i) t) = compileInt i
+compileExp (ETyped (EDouble d) t) = compileDouble d
+compileExp (ETyped (EId i) t) = do
+  address <- lookupVar i  
+  compileLoadVar t address
+compileExp (ETyped (EApp id exps) t) = do
   mapM_ compileExp exps
+  ft <- lookupFun id
+  emit $ ft
+compileExp (ETyped (EPIncr i) t) = do -- i++
+  address <- lookupVar i
+  compileLoadVar t address
+  compileDup t
+  case t of
+    Type_double -> compileDouble 1.0
+    _ -> compileInt 1
+  compileAlg t Plus
+  compileStoreVar t address
+compileExp (ETyped (EPDecr i) t) = do
+  address <- lookupVar i
+  compileLoadVar t address
+  compileDup t
+  case t of
+    Type_double -> compileDouble 1.0
+    _ -> compileInt 1
+  compileAlg t Minus
+  compileStoreVar t address
+compileExp (ETyped (EIncr i) t) = do -- ++i
+  address <- lookupVar i
+  compileLoadVar t address
+  case t of
+    Type_double -> compileDouble 1.0
+    _ -> compileInt 1
+  compileAlg t Plus
+  compileDup t
+  compileStoreVar t address
+compileExp (ETyped (EDecr i) t) = do
+  address <- lookupVar i
+  compileLoadVar t address
+  case t of
+    Type_double -> compileDouble 1.0
+    _ -> compileInt 1
+  compileAlg t Minus
+  compileDup t
+  compileStoreVar t address
 compileExp (ETyped (ETimes e1 e2) t) = do
   compileExp e1 
   compileExp e2
-  case t of    
-    Type_double -> emit $ "dmul"
-    _ -> emit $ "imul"
+  compileAlg t Times
 compileExp (ETyped (EDiv e1 e2) t) = do
   compileExp e1 
   compileExp e2
-  case t of    
-    Type_double -> emit $ "ddiv"
-    _ -> emit $ "idiv"
+  compileAlg t Div
 compileExp (ETyped (EPlus e1 e2) t) = do
   compileExp e1 
   compileExp e2
-  case t of    
-    Type_double -> emit $ "dadd"
-    _ -> emit $ "iadd"
-compileExp (ETyped (EPlus e1 e2) t) = do
+  compileAlg t Plus
+compileExp (ETyped (EMinus e1 e2) t) = do
   compileExp e1 
   compileExp e2
-  case t of    
-    Type_double -> emit $ "dsub"
-    _ -> emit $ "isub"
-compileExp (EEq e1 e2) = compileCmp Equal e1 e2
-  
-compileCmp :: Cmp -> Exp -> Exp -> State Env ()
-compileCmp c e1 e2 = do 
-  labelTrue <- newLabel
-  labelEnd <- newLabel
-  compileExp e1
+  compileAlg t Minus
+compileExp (ETyped (ELt e1 e2) t) = compileCmp Lt e1 e2 t
+compileExp (ETyped (EGt e1 e2) t) = compileCmp Gt e1 e2 t
+compileExp (ETyped (ELtEq e1 e2) t) = compileCmp Le e1 e2 t
+compileExp (ETyped (EGtEq e1 e2) t) = compileCmp Ge e1 e2 t
+compileExp (ETyped (EEq e1 e2) t) = compileCmp Equal e1 e2 t
+compileExp (ETyped (ENEq e1 e2) t) = compileCmp NEqual e1 e2 t
+compileExp (ETyped (EAnd e1 e2) t) = compileBool (EAnd e1 e2)
+compileExp (ETyped (EOr e1 e2) t) = compileBool (EOr e1 e2)
+compileExp (ETyped (EAss i e2) t) = do
   compileExp e2
-  emit (show c ++ labelTrue)
-  emit $ "iconst_0"
-  emit ("goto " ++ labelEnd)
-  emit (labelTrue ++ ":")
-  emit $ "iconst_1"
-  emit (labelEnd ++ ":")
+  address <- lookupVar i
+  compileDup t
+  compileStoreVar t address
+
+
+--[[[ FUNCIONES AUXILIARES ]]]
 
 -- Hints: usefull auxiliary functions for comparations compilation
 data Cmp = Equal | NEqual | Lt | Gt | Ge | Le
+  deriving (Eq)
+
+data Alg = Times | Div | Plus | Minus
   deriving (Eq)
 
 instance Show Cmp where
@@ -253,3 +313,111 @@ showDbl Lt     = "iflt "
 showDbl Gt     = "ifgt "
 showDbl Ge     = "ifge "
 showDbl Le     = "ifle "
+
+-- Operaciones algebráicas no-dobles
+showIntAlg :: Alg -> Instruction
+showIntAlg Times = "imul"
+showIntAlg Div = "idiv"
+showIntAlg Plus = "iadd"
+showIntAlg Minus = "isub"
+
+-- Operaciones algebráicas dobles
+showDblAlg :: Alg -> Instruction
+showDblAlg Times = "dmul"
+showDblAlg Div = "ddiv"
+showDblAlg Plus = "dadd"
+showDblAlg Minus = "dsub"
+
+compileAlg :: Type -> Alg -> State Env ()
+compileAlg Type_double e = emit (showDblAlg e)
+compileAlg _ e = emit (showIntAlg e)
+
+compileDup :: Type -> State Env ()
+compileDup t = case t of
+    Type_double -> do
+      emit $ "dup2"
+    _ -> do
+      emit $ "dup"
+
+compileStoreVar :: Type -> Int -> State Env ()
+compileStoreVar t address = case t of
+    Type_double -> do
+      emit $ "dstore " ++ show address
+    Type_string -> do
+      emit $ "astore " ++ show address
+    _ -> do
+      emit $ "istore " ++ show address
+
+compileLoadVar :: Type -> Int -> State Env ()
+compileLoadVar t address = case t of
+    Type_string -> emit $ "aload " ++ show address
+    Type_double -> emit $ "dload " ++ show address
+    _ -> emit $ "iload " ++ show address
+
+-- Emite el código para pushear un entero al stack
+compileInt :: Integer -> State Env ()
+compileInt -1 = emit $ "iconst_m1"
+compileInt 0 = emit $ "iconst_0"
+compileInt 1 = emit $ "iconst_1"
+compileInt 2 = emit $ "iconst_2"
+compileInt 3 = emit $ "iconst_3"
+compileInt 4 = emit $ "iconst_4"
+compileInt 5 = emit $ "iconst_5"
+compileInt i 
+ | -256 <= i && i < 256 = emit $ "bipush " ++ show i
+ | otherwise = emit $ "ldc " ++ show i
+
+-- Emite el código de push double al stack
+compileDouble :: Double -> State Env ()
+compileDouble 0.0 = emit $ "dconst_0"
+compileDouble 1.0 = emit $ "dconst_1"
+compileDouble d = emit $ "ldc2_w " ++ show d
+
+-- Emite el código para compilar comparaciones
+compileCmp :: Cmp -> Exp -> Exp -> Type -> State Env ()
+compileCmp c e1 e2 Type_double = do 
+  labelTrue <- newLabel
+  labelEnd <- newLabel
+  compileExp e1
+  compileExp e2
+  emit $ "dcmpg"
+  emit (showDbl c ++ labelTrue)
+  emit $ "iconst_0"
+  emit ("goto " ++ labelEnd)
+  emit (labelTrue ++ ":")
+  emit $ "iconst_1"
+  emit (labelEnd ++ ":")
+compileCmp c e1 e2 _ = do -- TODO: Mejorar lógica de comparación para usar solo un jump.
+  labelTrue <- newLabel
+  labelEnd <- newLabel
+  compileExp e1
+  compileExp e2
+  emit (show c ++ labelTrue)
+  emit $ "iconst_0"
+  emit ("goto " ++ labelEnd)
+  emit (labelTrue ++ ":")
+  emit $ "iconst_1"
+  emit (labelEnd ++ ":")
+
+-- Emite el código de compilar conjunciones y disyunciones.
+compileBool :: Exp -> State Env ()
+compileBool (EAnd e1 e2) = do
+  labelFalse <- newLabel
+  labelEnd <- newLabel
+  compileExp e1
+  emit ("ifeq " ++ labelFalse)
+  compileExp e2
+  emit ("goto " ++ labelEnd)
+  emit (labelFalse ++ ":")
+  emit $ "iconst_0"
+  emit (labelEnd ++ ":")
+compileBool (EOr e1 e2) = do
+  labelTrue <- newLabel
+  labelEnd <- newLabel
+  compileExp e1
+  emit ("ifeq " ++ labelTrue)
+  emit $ "iconst_1"
+  emit ("goto " ++ labelEnd)
+  emit (labelTrue ++ ":")
+  compileExp e2
+  emit (labelEnd ++ ":")

@@ -38,10 +38,10 @@ data Exp
     | EString String
     | EId Id
     | EApp Id [Exp]
-    | EPIncr Exp
-    | EPDecr Exp
-    | EIncr Exp
-    | EDecr Exp
+    | EPIncr Id
+    | EPDecr Id
+    | EIncr Id
+    | EDecr Id
     | ETimes Exp Exp
     | EDiv Exp Exp
     | EPlus Exp Exp
@@ -54,7 +54,7 @@ data Exp
     | ENEq Exp Exp
     | EAnd Exp Exp
     | EOr Exp Exp
-    | EAss Exp Exp
+    | EAss Id Exp
     | ETyped Exp Type
   deriving (C.Eq, C.Ord, C.Show, C.Read)
 
