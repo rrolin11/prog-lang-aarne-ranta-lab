@@ -11,6 +11,7 @@ import Control.Monad
 import Control.Monad.Trans.State.Lazy
 import Data.Maybe
 --import Control.Monad.State
+import Debug.Trace
 
 type Instruction = String
 type FunType     = String
@@ -27,7 +28,7 @@ data Env = Env {
 
 emptyEnv :: Env
 emptyEnv = Env { funs=Map.empty,
-                 vars=[], -- Mapea el nombre de variable y su dirección de memoria.
+                 vars=[Map.empty], -- Mapea el nombre de variable y su dirección de memoria.
                  maxvars=[0],
                  maxstk=0,
                  labels=0,
@@ -45,8 +46,7 @@ extendVar t i = do
   s <- get
   let m:ms = vars s
   let a:as = maxvars s
-  put $ s {vars = (Map.insert i a m):ms}
-  put $ s {maxvars = (a + (typeSize t)):as}
+  put $ s {vars = (Map.insert i a m):ms, maxvars = (a + (typeSize t)):as}
 
 extendArg :: Arg -> State Env ()
 extendArg (ADecl t i) = extendVar t i
@@ -86,18 +86,14 @@ extendBuiltinDefs = mapM_ ( \ ((Id i),(argTys,rty)) -> extendFunEnv i $ funJVM i
 newBlock :: State Env ()
 newBlock = do
   s <- get
-  let v = vars s 
-  let m = maxvars s 
-  put $ s {vars = (Map.empty):v}
-  put $ s {maxvars = (head m):m}
+  put $ s { vars = (Map.empty):(vars s), maxvars = (head (maxvars s)):(maxvars s) }
 
 exitBlock :: State Env ()
 exitBlock = do
   s <- get
   let v:vs = vars s 
   let m:ms = maxvars s 
-  put $ s {vars = vs}
-  put $ s {maxvars = ms}
+  put $ s {vars = vs, maxvars = ms}
 
 newLabel :: State Env String
 newLabel = do
@@ -128,7 +124,9 @@ lookupVar i = do
 compile :: String -> Program -> [Instruction]
 compile cls p = do 
   let s = execState (compileP cls p) emptyEnv
-  reverse (code s)
+  let instructions = reverse (code s)
+  traceM ("DEBUG [checkDefs]: " ++ show instructions)
+  instructions
 
 compileP :: String -> Program -> State Env () 
 compileP cls (PDefs defs) = do
@@ -147,7 +145,8 @@ compileP cls (PDefs defs) = do
 
 compileDef :: Def -> State Env ()
 compileDef (DFun t (Id i) args stmts) = do
-  newBlock 
+  newBlock   
+  s <- get
   if i == "main" then do
        emit $ ".method public static main([Ljava/lang/String;)V"
        extendVar Type_string (Id "args") -- in fact is an array of strings ([Ljava/lang/String;)
@@ -161,12 +160,10 @@ compileDef (DFun t (Id i) args stmts) = do
   emit $ ".end method"
   emit ""
 
+
+-- Compilador de sentencias
 compileStm :: Stm -> State Env ()
-compileStm (SExp (ETyped e t)) = do
-  compileExp e  
-  case t of
-    Type_double -> emit $ "pop2"
-    _ -> emit $ "pop"
+compileStm (SExp e) = compileStmExp e
 compileStm (SDecls t ids) = do
   extendVars t ids
 compileStm (SInit t id exp) = do
@@ -210,11 +207,13 @@ compileStm (SBlock sms) = do
   mapM_ compileStm sms
   exitBlock
 
+-- Compilador de expresiones
 compileExp :: Exp -> State Env ()
 compileExp (ETyped EFalse t) = emit $ "iconst_0"
 compileExp (ETyped ETrue t) = emit $ "iconst_1"
 compileExp (ETyped (EInt i) t) = compileInt i
 compileExp (ETyped (EDouble d) t) = compileDouble d
+compileExp (ETyped (EString s) t) = emit $ "ldc " ++ s
 compileExp (ETyped (EId i) t) = do
   address <- lookupVar i  
   compileLoadVar t address
@@ -274,12 +273,12 @@ compileExp (ETyped (EMinus e1 e2) t) = do
   compileExp e1 
   compileExp e2
   compileAlg t Minus
-compileExp (ETyped (ELt e1 e2) t) = compileCmp Lt e1 e2 t
-compileExp (ETyped (EGt e1 e2) t) = compileCmp Gt e1 e2 t
-compileExp (ETyped (ELtEq e1 e2) t) = compileCmp Le e1 e2 t
-compileExp (ETyped (EGtEq e1 e2) t) = compileCmp Ge e1 e2 t
-compileExp (ETyped (EEq e1 e2) t) = compileCmp Equal e1 e2 t
-compileExp (ETyped (ENEq e1 e2) t) = compileCmp NEqual e1 e2 t
+compileExp (ETyped (ELt e1 e2) t) = compileCmp Lt e1 e2
+compileExp (ETyped (EGt e1 e2) t) = compileCmp Gt e1 e2
+compileExp (ETyped (ELtEq e1 e2) t) = compileCmp Le e1 e2
+compileExp (ETyped (EGtEq e1 e2) t) = compileCmp Ge e1 e2
+compileExp (ETyped (EEq e1 e2) t) = compileCmp Equal e1 e2
+compileExp (ETyped (ENEq e1 e2) t) = compileCmp NEqual e1 e2
 compileExp (ETyped (EAnd e1 e2) t) = compileBool (EAnd e1 e2)
 compileExp (ETyped (EOr e1 e2) t) = compileBool (EOr e1 e2)
 compileExp (ETyped (EAss i e2) t) = do
@@ -287,6 +286,7 @@ compileExp (ETyped (EAss i e2) t) = do
   address <- lookupVar i
   compileDup t
   compileStoreVar t address
+compileExp _ = return ()
 
 
 --[[[ FUNCIONES AUXILIARES ]]]
@@ -328,9 +328,37 @@ showDblAlg Div = "ddiv"
 showDblAlg Plus = "dadd"
 showDblAlg Minus = "dsub"
 
+-- Compila las sentencias de tipo exp. Las que son del estilo "1 + 1;" son ignoradas.
+compileStmExp :: Exp -> State Env ()
+compileStmExp (ETyped (EAss i e) t) = compileExp (ETyped (EAss i e) t)
+compileStmExp (ETyped (EApp i e) t) = compileExp (ETyped (EApp i e) t)
+compileStmExp (ETyped (EPIncr i) t) = do
+  compileExp (ETyped (EPIncr i) t)
+  compilePop t
+compileStmExp (ETyped (EPDecr i) t) = do
+  compileExp (ETyped (EPDecr i) t)
+  compilePop t
+compileStmExp (ETyped (EIncr i) t) = do
+  compileExp (ETyped (EIncr i) t)
+  compilePop t
+compileStmExp (ETyped (EDecr i) t) = do
+  compileExp (ETyped (EDecr i) t)
+  compilePop t
+compileStmExp _ = emit $ "nop"
+
 compileAlg :: Type -> Alg -> State Env ()
+compileAlg Type_string Plus = do
+  ft <- lookupFun (Id "concatStr") 
+  emit $ show ft
 compileAlg Type_double e = emit (showDblAlg e)
 compileAlg _ e = emit (showIntAlg e)
+
+compilePop :: Type -> State Env ()
+compilePop t = case t of
+    Type_double -> do
+      emit $ "pop2"
+    _ -> do
+      emit $ "pop"
 
 compileDup :: Type -> State Env ()
 compileDup t = case t of
@@ -374,11 +402,11 @@ compileDouble 1.0 = emit $ "dconst_1"
 compileDouble d = emit $ "ldc2_w " ++ show d
 
 -- Emite el código para compilar comparaciones
-compileCmp :: Cmp -> Exp -> Exp -> Type -> State Env ()
-compileCmp c e1 e2 Type_double = do 
+compileCmp :: Cmp -> Exp -> Exp -> State Env ()
+compileCmp c (ETyped e Type_double) e2 = do 
   labelTrue <- newLabel
   labelEnd <- newLabel
-  compileExp e1
+  compileExp (ETyped e Type_double)
   compileExp e2
   emit $ "dcmpg"
   emit (showDbl c ++ labelTrue)
@@ -387,7 +415,7 @@ compileCmp c e1 e2 Type_double = do
   emit (labelTrue ++ ":")
   emit $ "iconst_1"
   emit (labelEnd ++ ":")
-compileCmp c e1 e2 _ = do -- TODO: Mejorar lógica de comparación para usar solo un jump.
+compileCmp c e1 e2 = do -- TODO: Mejorar lógica de comparación para usar solo un jump.
   labelTrue <- newLabel
   labelEnd <- newLabel
   compileExp e1
