@@ -26,3 +26,12 @@ Será necesario contar con BNFC Converter, Make, Happy y Alex para poder compila
 * __progs-test-lab2.hs__: Situado dentro de la carpeta __test__. Se compila con el comando ghc y con éste se realizan todos los casos de prueba. Ejecutar con el comando "progs-test-lab2-hs ..".
 * __make__: Genera el archivo ejecutable lab2.exe
 * __lab2.exe < test/[carpeta]/[archivo test].cc__: Ejecuta el programa con el input que contiene el archivo .cc.
+
+## Tarea 3
+
+* El proyecto requiere tener una carpeta good (contiene casos de prueba correctos, ya que se asume que pasaron por el Typechecker) y una carpeta bad (vacía), para poder realizar pruebas automatizadas.
+* El archivo Compiler.hs implementa el compilador y todas las instrucciones equivalentes para la JVM. La función de entrada es compile.
+* Es necesario instalar JDK para utilizar Jasmine.
+* __ccpp.hs__: Consume los programas .cc y los envía al Compiler.hs.
+* __make__: Genera el archivo ejecutable lab2.exe
+* __progs-test-lab3.hs__: Se compila con el comando GHC. Genera un ejecutable el cual se corre con el comando "./progs-test-lab3.exe ." y ejecuta todas las pruebas atomáticas.
