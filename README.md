@@ -9,7 +9,7 @@ En este repositorio se implementan las tareas planteadas en el libro "Implementi
 
 ## Dependencias
 
-Será necesario contar con BNFC Converter, Make, Happy y Alex para poder compilar las gramáticas y ejecutar pruebas.
+Será necesario contar con BNFC Converter, Make, Happy, Alex para poder compilar las gramáticas y ejecutar pruebas. Adicionalmente, para el compilador se requiere JDK.
 
 ## Tarea 1
 
