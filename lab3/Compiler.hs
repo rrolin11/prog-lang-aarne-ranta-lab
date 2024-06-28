@@ -173,7 +173,7 @@ compileStm (SInit t id exp) = do
   compileExp exp
   compileStoreVar t address
 compileStm (SReturn (ETyped e t)) = do
-  compileExp e
+  compileExp (ETyped e t)
   case t of
     Type_double -> do
       emit $ "dreturn"
@@ -213,7 +213,7 @@ compileExp (ETyped EFalse t) = emit $ "iconst_0"
 compileExp (ETyped ETrue t) = emit $ "iconst_1"
 compileExp (ETyped (EInt i) t) = compileInt i
 compileExp (ETyped (EDouble d) t) = compileDouble d
-compileExp (ETyped (EString s) t) = emit $ "ldc " ++ s
+compileExp (ETyped (EString s) t) = emit $ "ldc " ++ show s
 compileExp (ETyped (EId i) t) = do
   address <- lookupVar i  
   compileLoadVar t address
@@ -330,26 +330,15 @@ showDblAlg Minus = "dsub"
 
 -- Compila las sentencias de tipo exp. Las que son del estilo "1 + 1;" son ignoradas.
 compileStmExp :: Exp -> State Env ()
-compileStmExp (ETyped (EAss i e) t) = compileExp (ETyped (EAss i e) t)
 compileStmExp (ETyped (EApp i e) t) = compileExp (ETyped (EApp i e) t)
-compileStmExp (ETyped (EPIncr i) t) = do
-  compileExp (ETyped (EPIncr i) t)
+compileStmExp (ETyped e t) = do 
+  compileExp (ETyped e t)
   compilePop t
-compileStmExp (ETyped (EPDecr i) t) = do
-  compileExp (ETyped (EPDecr i) t)
-  compilePop t
-compileStmExp (ETyped (EIncr i) t) = do
-  compileExp (ETyped (EIncr i) t)
-  compilePop t
-compileStmExp (ETyped (EDecr i) t) = do
-  compileExp (ETyped (EDecr i) t)
-  compilePop t
-compileStmExp _ = emit $ "nop"
 
 compileAlg :: Type -> Alg -> State Env ()
 compileAlg Type_string Plus = do
-  ft <- lookupFun (Id "concatStr") 
-  emit $ show ft
+  ft <- lookupFun (Id "concatStr")
+  emit $ ft
 compileAlg Type_double e = emit (showDblAlg e)
 compileAlg _ e = emit (showIntAlg e)
 
@@ -386,7 +375,9 @@ compileLoadVar t address = case t of
 compileInt :: Integer -> State Env ()
 compileInt -1 = emit $ "iconst_m1"
 compileInt 0 = emit $ "iconst_0"
-compileInt 1 = emit $ "iconst_1"
+compileInt 1 = do  
+  traceM ("DEBUG [compileInt]: Compilando iconst_1")
+  emit $ "iconst_1"
 compileInt 2 = emit $ "iconst_2"
 compileInt 3 = emit $ "iconst_3"
 compileInt 4 = emit $ "iconst_4"
