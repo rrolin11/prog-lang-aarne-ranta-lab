@@ -5,10 +5,7 @@ En este repositorio se implementan las tareas planteadas en el libro "Implementi
 ## Tareas:
 1. [Parser para C++](https://www.grammaticalframework.org/ipl-book/assignments/assignment1/assignment1.html)
 2. [Verificador de típos para C++](https://www.grammaticalframework.org/ipl-book/assignments/assignment2/assignment2.html)
-3. [Intérprete para C++](https://www.grammaticalframework.org/ipl-book/assignments/assignment3/assignment3.html)
-4. [Generador de código para C++](https://www.grammaticalframework.org/ipl-book/assignments/assignment4/assignment4.html)
-5. [Intérprete para Fun](https://www.grammaticalframework.org/ipl-book/assignments/assignment5/assignment5.html)
-6. [Un lenguaje de propósito especial](https://www.grammaticalframework.org/ipl-book/assignments/assignment6/assignment6.html)
+3. [Generador de código para C++](https://www.grammaticalframework.org/ipl-book/assignments/assignment4/assignment4.html)
 
 ## Dependencias
 
